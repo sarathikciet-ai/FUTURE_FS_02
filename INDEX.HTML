@@ -1,0 +1,354 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Mini Store — Modern UI</title>
+
+  <!-- Tailwind CDN (for prototyping) -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    /* Slight darker tone, Apple-like minimal */
+    :root{
+      --bg:#0f1724; /* deep navy background */
+      --card:#0b1220; 
+      --muted:#9aa6b2;
+      --accent:#111827;
+    }
+    body{ background: linear-gradient(180deg,var(--bg), #071027 120%); color: #e6eef6; -webkit-font-smoothing:antialiased; font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial; }
+    .glass { background: rgba(255,255,255,0.03); backdrop-filter: blur(6px); border: 1px solid rgba(255,255,255,0.04); }
+    .btn-primary { background: linear-gradient(90deg,#111827,#0c1220); color: white; padding: 0.5rem 1rem; border-radius: 12px; }
+  </style>
+</head>
+<body class="min-h-screen">
+
+  <div class="max-w-6xl mx-auto p-6">
+    <!-- Header -->
+    <header class="flex items-center justify-between mb-6">
+      <div class="flex items-center gap-4">
+        <div class="w-12 h-12 rounded-xl bg-white/5 flex items-center justify-center text-xl font-bold">MS</div>
+        <div>
+          <h1 class="text-2xl font-semibold">Mini Store</h1>
+          <p class="text-sm text-[--muted]">Apple-like modern UI — black & white tone</p>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-4">
+        <div id="userStatus" class="text-sm text-[--muted]">Not logged in</div>
+        <button id="btnLogin" class="btn-primary">Login</button>
+        <button id="viewCart" class="px-4 py-2 border rounded-lg">Cart (<span id="cartCount">0</span>)</button>
+      </div>
+    </header>
+
+    <main class="grid grid-cols-1 md:grid-cols-4 gap-6">
+      <!-- Left: Store / Products (col-span-3) -->
+      <section class="md:col-span-3">
+        <!-- Search and filters -->
+        <div class="mb-4 flex gap-3 items-center">
+          <input id="searchInput" type="text" placeholder="Search products..." class="w-full p-3 rounded-lg glass" />
+          <select id="categoryFilter" class="p-3 rounded-lg glass">
+            <option value="">All</option>
+          </select>
+        </div>
+
+        <!-- Product grid -->
+        <div id="productGrid" class="grid grid-cols-1 sm:grid-cols-2 gap-4"></div>
+      </section>
+
+      <!-- Right: Cart & Checkout -->
+      <aside class="glass p-4 rounded-2xl">
+        <h3 class="text-lg font-semibold mb-2">Cart</h3>
+        <div id="cartList" class="space-y-3 max-h-64 overflow-y-auto"></div>
+
+        <div class="mt-4 border-t pt-4">
+          <div class="flex justify-between text-sm text-[--muted]">
+            <div>Subtotal</div>
+            <div id="subtotal">₹0.00</div>
+          </div>
+
+          <button id="checkoutBtn" class="w-full mt-3 py-2 rounded-xl btn-primary">Checkout</button>
+        </div>
+      </aside>
+    </main>
+  </div>
+
+  <!-- Login Modal -->
+  <div id="modalLogin" class="fixed inset-0 hidden items-center justify-center z-50">
+    <div class="absolute inset-0 bg-black/60"></div>
+    <div class="relative max-w-md w-full p-6 glass rounded-2xl z-10">
+      <h2 class="text-xl font-semibold mb-3">Login</h2>
+      <form id="loginForm" class="space-y-3">
+        <input id="loginEmail" class="w-full p-3 rounded-lg bg-transparent border border-white/10" placeholder="Email" required />
+        <input id="loginPass" class="w-full p-3 rounded-lg bg-transparent border border-white/10" placeholder="Password" type="password" required />
+        <div class="flex gap-3">
+          <button type="submit" class="btn-primary">Sign in</button>
+          <button type="button" id="closeLogin" class="px-4 py-2 border rounded-lg">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Checkout Modal -->
+  <div id="modalCheckout" class="fixed inset-0 hidden items-center justify-center z-50">
+    <div class="absolute inset-0 bg-black/60"></div>
+    <div class="relative max-w-lg w-full p-6 glass rounded-2xl z-10">
+      <h2 class="text-xl font-semibold mb-3">Checkout</h2>
+      <form id="checkoutForm" class="space-y-3" enctype="multipart/form-data">
+        <input name="name" id="custName" class="w-full p-3 rounded-lg bg-transparent border border-white/10" placeholder="Your name" required />
+        <input name="phone" id="custPhone" class="w-full p-3 rounded-lg bg-transparent border border-white/10" placeholder="Your phone (with country code, e.g. 91XXXXXXXXXX)" required />
+        <textarea name="address" id="custAddress" class="w-full p-3 rounded-lg bg-transparent border border-white/10" placeholder="Delivery address" rows="3" required></textarea>
+
+        <div>
+          <label class="text-sm text-[--muted]">Upload image (optional — product image / note)</label>
+          <input id="fileInput" name="image" type="file" accept="image/*" class="block mt-2" />
+          <img id="previewImg" src="#" alt="preview" class="mt-2 max-h-40 hidden rounded-lg" />
+        </div>
+
+        <div class="flex gap-3">
+          <button type="submit" class="btn-primary">Place Order</button>
+          <button type="button" id="closeCheckout" class="px-4 py-2 border rounded-lg">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Order Confirmation Popup (small toast) -->
+  <div id="orderToast" class="fixed right-6 bottom-6 hidden z-40">
+    <div class="glass p-4 rounded-xl shadow-lg">
+      <div class="flex items-center gap-3">
+        <div class="text-green-400 font-bold">✓</div>
+        <div>
+          <div id="toastTitle" class="font-semibold">Order placed</div>
+          <div id="toastMsg" class="text-sm text-[--muted]">WhatsApp opening…</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ---------- Basic Data & state ----------
+    const API_BASE = ""; // if serving static + API from same server, set '/api' endpoints in app.py to work
+    const products = [
+      { id: 1, title: "Sleek Headphones", price: 2499, category: "Audio", img: "" },
+      { id: 2, title: "Minimal Lamp", price: 1299, category: "Home", img: "" },
+      { id: 3, title: "Notebook Pro", price: 999, category: "Stationery", img: "" },
+      { id: 4, title: "Wireless Charger", price: 799, category: "Gadgets", img: "" },
+    ];
+
+    let cart = {}; // {productId: qty}
+    let user = null;
+
+    // ---------- Render products ----------
+    const productGrid = document.getElementById('productGrid');
+    const categoryFilter = document.getElementById('categoryFilter');
+    const searchInput = document.getElementById('searchInput');
+
+    function uniqueCategories(){
+      const cats = [...new Set(products.map(p=>p.category))];
+      cats.forEach(c=>{
+        const opt = document.createElement('option');
+        opt.value = c; opt.textContent = c;
+        categoryFilter.appendChild(opt);
+      });
+    }
+    function renderProducts(){
+      productGrid.innerHTML = "";
+      const q = searchInput.value.toLowerCase();
+      const cat = categoryFilter.value;
+      const filtered = products.filter(p=>{
+        if(cat && p.category !== cat) return false;
+        if(q && !p.title.toLowerCase().includes(q)) return false;
+        return true;
+      });
+      filtered.forEach(p=>{
+        const card = document.createElement('div');
+        card.className = 'p-4 rounded-2xl glass flex gap-4 items-center';
+        card.innerHTML = `
+          <div class="w-24 h-24 bg-white/5 rounded-lg flex items-center justify-center text-xl">${p.title.split(' ')[0]}</div>
+          <div class="flex-1">
+            <div class="font-semibold">${p.title}</div>
+            <div class="text-sm text-[--muted]">${p.category}</div>
+            <div class="mt-2 flex items-center justify-between">
+              <div class="font-semibold">₹${p.price}</div>
+              <div>
+                <button class="px-3 py-1 text-sm border rounded-lg addBtn" data-id="${p.id}">Add</button>
+              </div>
+            </div>
+          </div>
+        `;
+        productGrid.appendChild(card);
+      });
+
+      // attach add handlers
+      document.querySelectorAll('.addBtn').forEach(b=>{
+        b.addEventListener('click', (e)=>{
+          const id = parseInt(e.currentTarget.dataset.id);
+          addToCart(id);
+        });
+      });
+    }
+
+    // ---------- Cart Logic ----------
+    const cartList = document.getElementById('cartList');
+    const cartCount = document.getElementById('cartCount');
+    const subtotalEl = document.getElementById('subtotal');
+
+    function addToCart(id){
+      cart[id] = (cart[id] || 0) + 1;
+      renderCart();
+    }
+    function removeFromCart(id){
+      delete cart[id]; renderCart();
+    }
+    function changeQty(id, amt){
+      cart[id] = Math.max(1, (cart[id]||0) + amt);
+      renderCart();
+    }
+    function renderCart(){
+      cartList.innerHTML = "";
+      let total = 0; let count = 0;
+      for(const idStr of Object.keys(cart)){
+        const id = parseInt(idStr);
+        const p = products.find(x=>x.id===id);
+        const qty = cart[id];
+        total += p.price * qty; count += qty;
+        const row = document.createElement('div');
+        row.className = 'flex items-center justify-between gap-3';
+        row.innerHTML = `
+          <div>
+            <div class="font-medium">${p.title}</div>
+            <div class="text-sm text-[--muted]">₹${p.price} x ${qty}</div>
+          </div>
+          <div class="flex items-center gap-2">
+            <button class="px-2 py-1 border rounded qtyMinus" data-id="${id}">-</button>
+            <div class="px-2">${qty}</div>
+            <button class="px-2 py-1 border rounded qtyPlus" data-id="${id}">+</button>
+            <button class="px-2 py-1 text-sm text-red-400 removeBtn" data-id="${id}">x</button>
+          </div>
+        `;
+        cartList.appendChild(row);
+      }
+      cartCount.textContent = count;
+      subtotalEl.textContent = `₹${total.toFixed(2)}`;
+      // attach events
+      document.querySelectorAll('.qtyPlus').forEach(b=> b.addEventListener('click', e=> changeQty(parseInt(e.currentTarget.dataset.id), 1)));
+      document.querySelectorAll('.qtyMinus').forEach(b=> b.addEventListener('click', e=> changeQty(parseInt(e.currentTarget.dataset.id), -1)));
+      document.querySelectorAll('.removeBtn').forEach(b=> b.addEventListener('click', e=> removeFromCart(parseInt(e.currentTarget.dataset.id))));
+    }
+
+    // ---------- Modals & Login ----------
+    const modalLogin = document.getElementById('modalLogin');
+    const btnLogin = document.getElementById('btnLogin');
+    const closeLogin = document.getElementById('closeLogin');
+    const loginForm = document.getElementById('loginForm');
+    const userStatus = document.getElementById('userStatus');
+
+    btnLogin.addEventListener('click', ()=> modalLogin.classList.remove('hidden'), modalLogin.classList.add('flex'));
+    closeLogin.addEventListener('click', ()=> modalLogin.classList.add('hidden'));
+    loginForm.addEventListener('submit', (e)=>{
+      e.preventDefault();
+      const email = document.getElementById('loginEmail').value.trim();
+      user = { email };
+      userStatus.textContent = email;
+      modalLogin.classList.add('hidden');
+    });
+
+    // Checkout modal
+    const modalCheckout = document.getElementById('modalCheckout');
+    const checkoutBtn = document.getElementById('checkoutBtn');
+    const closeCheckout = document.getElementById('closeCheckout');
+    const checkoutForm = document.getElementById('checkoutForm');
+    const orderToast = document.getElementById('orderToast');
+
+    checkoutBtn.addEventListener('click', ()=>{
+      if(Object.keys(cart).length === 0){ alert("Cart is empty"); return; }
+      modalCheckout.classList.remove('hidden'); modalCheckout.classList.add('flex');
+    });
+    closeCheckout.addEventListener('click', ()=> modalCheckout.classList.add('hidden'));
+
+    // File preview
+    const fileInput = document.getElementById('fileInput');
+    const previewImg = document.getElementById('previewImg');
+    fileInput.addEventListener('change', (e)=>{
+      const f = e.target.files[0];
+      if(!f) { previewImg.classList.add('hidden'); return; }
+      const url = URL.createObjectURL(f);
+      previewImg.src = url; previewImg.classList.remove('hidden');
+    });
+
+    // Place order -> send to backend then open WhatsApp with message + show popup
+    checkoutForm.addEventListener('submit', async (e)=>{
+      e.preventDefault();
+      const formData = new FormData(checkoutForm);
+      // append cart as json
+      formData.append('cart', JSON.stringify(cart));
+      // optional: include user email if logged in
+      if(user && user.email) formData.append('user_email', user.email);
+
+      // POST to /place_order (Flask backend)
+      try {
+        const res = await fetch('/place_order', { method: 'POST', body: formData });
+        const data = await res.json();
+        if(data.success){
+          // show toast
+          document.getElementById('toastTitle').textContent = 'Order placed';
+          document.getElementById('toastMsg').textContent = 'Opening WhatsApp with order details...';
+          orderToast.classList.remove('hidden');
+
+          // Build whatsapp message (use your phone number from form)
+          const phone = encodeURIComponent(document.getElementById('custPhone').value.trim());
+          const name = encodeURIComponent(document.getElementById('custName').value.trim());
+          const addr = encodeURIComponent(document.getElementById('custAddress').value.trim());
+          const items = encodeURIComponent(Object.entries(cart).map(([id,qty])=>{
+            const p = products.find(x=>x.id==id); return `${p.title} x ${qty}`;
+          }).join(', '));
+          const msg = encodeURIComponent(`New order from ${name}%0APhone:%20${phone}%0AAddress:%20${addr}%0AItems:%20${items}%0AOrderID:%20${data.orderId}`);
+
+          // Use wa.me click to chat. The cashier/owner number (recipient) must be provided.
+          // We'll open with the user-supplied phone number TO THEMSELVES if they gave own number.
+          // If you want to send to your store number, set storeNumber below (with country code, no +).
+          const storeNumber = ""; // e.g. "9199xxxxxxx" — leave blank to open chat to the user's phone (so they can message themselves)
+          let waLink;
+          if(storeNumber.trim().length>0){
+            waLink = `https://wa.me/${storeNumber}?text=${msg}`;
+          } else {
+            // open user's own number chat by using their phone (so they can send quickly)
+            const userPhoneOnly = phone.replace(/\D/g,'');
+            waLink = `https://wa.me/${userPhoneOnly}?text=${msg}`;
+          }
+
+          // small delay to let toast show
+          setTimeout(()=> {
+            window.open(waLink, '_blank');
+          }, 700);
+
+          // clear cart and close modal
+          cart = {}; renderCart();
+          modalCheckout.classList.add('hidden');
+
+          // hide toast after 5 sec
+          setTimeout(()=> orderToast.classList.add('hidden'), 5000);
+        } else {
+          alert('Failed to place order: ' + (data.error||'unknown'));
+        }
+      } catch(err){
+        console.error(err); alert('Network error while placing order.');
+      }
+    });
+
+    // Init
+    uniqueCategories();
+    renderProducts();
+    renderCart();
+
+    // search/filter events
+    searchInput.addEventListener('input', renderProducts);
+    categoryFilter.addEventListener('change', renderProducts);
+
+    // view cart quick open
+    document.getElementById('viewCart').addEventListener('click', ()=>{
+      window.scrollTo({ top: 9999, behavior: 'smooth' });
+    });
+  </script>
+</body>
+</html>
